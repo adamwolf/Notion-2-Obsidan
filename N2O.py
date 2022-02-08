@@ -12,10 +12,18 @@ from zipfile import ZipFile
 from pathlib import Path
 import N2Omodule
 from tempfile import TemporaryDirectory
-from easygui import fileopenbox
+import argparse
 
+parser = argparse.ArgumentParser(
+    usage="%(prog)s FILE",
+    description="Convert Notion export zip to Markdown for Obsidian"
+)
 
-NotionZip = Path(fileopenbox(filetypes = ['*.zip']))
+parser.add_argument('file', help='path to notion export zip file')
+
+args = parser.parse_args()
+
+NotionZip = Path(args.file)
 
 
 # Load zip file
