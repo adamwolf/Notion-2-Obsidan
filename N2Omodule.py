@@ -262,6 +262,8 @@ def internal_link_convert(line):
     regexRelativePathImage  =   compile("(?:\.png|\.jpg|\.gif|\.bmp|\.jpeg|\.svg)")
     regexSlash =    compile("\/")
 
+    substitution = None
+
     num_matchs = 0
     # Identify and group relative paths
     # While for incase multiple match on single line
@@ -289,11 +291,11 @@ def internal_link_convert(line):
                 title = str_slash_char_remove(title)
 
                 if title != markdownLinkMatch.group(1):
-                    print(line)
+                    substitution = [line]
                     line = regexMarkdownLink.sub("[["+title+"]]", line)
-                    print(f" remove forbid {line}\n")
+                    substitution.append(line)
 
-    return line, num_matchs
+    return line, num_matchs, substitution
 
 
 def feature_tags_convert(line):
@@ -327,7 +329,7 @@ def N2Omd(mdFile):
         line, cnt = embedded_link_convert(line)
         em_link_cnt += cnt
 
-        line, cnt = internal_link_convert(line)
+        line, cnt, substitution = internal_link_convert(line)
         in_link_cnt += cnt
 
         line, cnt = convertBlankLink(line)
@@ -342,6 +344,6 @@ def N2Omd(mdFile):
         frontmatter = ["---", "tags: [" + ", ".join(tags) + "]","---", ""]
         newLines = frontmatter + newLines
 
-    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt, tags_cnt]
+    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt, tags_cnt], substitution
 
     

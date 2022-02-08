@@ -113,6 +113,8 @@ for n in csvIndex:
             [print(line.rstrip(), file=tempFile) for line in mdTitle]
 
 too_long_filenames = []
+substitutions = {}
+
 num_link = [0, 0, 0, 0]
 # Process all MD files
 for n in mdIndex:
@@ -121,7 +123,9 @@ for n in mdIndex:
     with notionsData.open(NotionPathRaw[n], "r") as mdFile:
         
         # Find and convert Internal Links to Obsidian style
-        mdContent, cnt = N2Omodule.N2Omd(mdFile)
+        mdContent, cnt, substitution = N2Omodule.N2Omd(mdFile)
+        if substitution:
+            substitutions[NotionPathRaw[n]] = substitution
         num_link = [cnt[i]+num_link[i] for i in range(len(num_link))]
         
         # Exported md file include header in first line
@@ -172,6 +176,11 @@ print(f"    - Embedded links: {num_link[1]}")
 print(f"    - Blank links   : {num_link[2]}")
 print(f"    - Number tags   : {num_link[3]}")
 
+if substitutions:
+    print(f"\nLink substitutions:")
+    for key, (original, replacement) in substitutions.items():
+        print(f"    - {key}: {original} -> {replacement}")
+
 had_errors = bad_files or too_long_filenames
 if had_errors:
     print("Errors:")
@@ -179,13 +188,13 @@ if had_errors:
 if bad_files:
     print(f"\nBad attachment files found:")
     for filename in bad_files:
-        print(filename)
+        print(f"    - {filename}")
 
 if too_long_filenames:
     print("WARNING: Some generated filenames are too long. Please rename them in Notion.")
     print("Too long filenames:")
     for filename in too_long_filenames:
-        print(filename)
+        print(f"    - {filename}")
 
 
 # Save temporary file collection to new zip
