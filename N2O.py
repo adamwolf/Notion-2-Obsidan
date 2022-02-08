@@ -189,10 +189,9 @@ if too_long_filenames:
 
 
 # Save temporary file collection to new zip
-make_archive( NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
+output_filepath = make_archive(NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
 
-if bad_files or too_long_filenames:
-    sys.exit(1)
+print(f"Created output zip at {output_filepath}")
 
 
 # Close out!
