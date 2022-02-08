@@ -129,19 +129,24 @@ for n in mdIndex:
         new_file_name = mdContent[0].replace('# ', '') + '.md'
         new_file_name = regexForbitCharacter.sub("", new_file_name)
         newfilepath = tempPath / path.dirname(ObsidianPaths[n]) / new_file_name
-        
+
         # Check if file exists, append if true
         if path.exists(newfilepath):
             append_write = 'a' # append if already exists
         else:
             append_write = 'w' # make a new file if not
-        
+        if len(str(newfilepath)) >= 255:
+            print(f"WARNING: File name is too long, skipping {newfilepath}")
+            continue
+
         # Save modified content as new .md file
         with open(newfilepath, append_write, encoding='utf-8') as tempFile:
             [print(line.rstrip(), file=tempFile) for line in mdContent]
 
 
 
+
+bad_files = []
 
 #### Process all attachment files using othersIndex ####
 for n in othersIndex:
@@ -157,13 +162,7 @@ for n in othersIndex:
                 copyfileobj(zf, f)
     except:
         ## If there's issue, List bad files in a log file
-        with open(tempPath / 'ProblemFiles.md', 'a+', encoding='utf-8') as e:
-            if path.getsize(tempPath / 'ProblemFiles.md') == 0:
-                print('# List of corrupt files from', NotionZip, file=e)
-                print('', file=e)
-            print('  !!File Exception!!',ObsidianPaths[n])
-            print(NotionPathRaw[n], file=e)
-            print('', file=e)
+        bad_files.append(ObsidianPaths[n])
 
     
 print(f"\nTotal converted links:")
@@ -172,6 +171,12 @@ print(f"    - Embedded links: {num_link[1]}")
 print(f"    - Blank links   : {num_link[2]}")
 print(f"    - Number tags   : {num_link[3]}")
 
+if not bad_files:
+    print("No bad files found")
+else:
+    print(f"\nBad files found:")
+    for filename in bad_files:
+        print(filename)
 
 # Save temporary file collection to new zip
 make_archive( NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
