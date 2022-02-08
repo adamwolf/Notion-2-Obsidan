@@ -4,7 +4,7 @@ Created on Thu Jun 18 13:34:37 2020
 
 @author: books
 """
-
+import sys
 from os import makedirs, path
 from re import compile
 from shutil import copyfileobj, make_archive
@@ -13,6 +13,8 @@ from pathlib import Path
 import N2Omodule
 from tempfile import TemporaryDirectory
 import argparse
+import errno
+
 
 parser = argparse.ArgumentParser(
     usage="%(prog)s FILE",
@@ -110,7 +112,7 @@ for n in csvIndex:
         with open(newfilepath, append_write, encoding='utf-8') as tempFile:
             [print(line.rstrip(), file=tempFile) for line in mdTitle]
 
-
+too_long_filenames = []
 num_link = [0, 0, 0, 0]
 # Process all MD files
 for n in mdIndex:
@@ -135,19 +137,18 @@ for n in mdIndex:
             append_write = 'a' # append if already exists
         else:
             append_write = 'w' # make a new file if not
-        if len(str(newfilepath)) >= 255:
-            print(f"WARNING: File name is too long, skipping {newfilepath}")
-            continue
 
-        # Save modified content as new .md file
-        with open(newfilepath, append_write, encoding='utf-8') as tempFile:
-            [print(line.rstrip(), file=tempFile) for line in mdContent]
-
-
-
+        try:
+            # Save modified content as new .md file
+            with open(newfilepath, append_write, encoding='utf-8') as tempFile:
+                [print(line.rstrip(), file=tempFile) for line in mdContent]
+        except OSError as exc:
+            if exc.errno == errno.ENAMETOOLONG:
+                too_long_filenames.append(new_file_name)
+            else:
+                raise
 
 bad_files = []
-
 #### Process all attachment files using othersIndex ####
 for n in othersIndex:
     
@@ -171,18 +172,31 @@ print(f"    - Embedded links: {num_link[1]}")
 print(f"    - Blank links   : {num_link[2]}")
 print(f"    - Number tags   : {num_link[3]}")
 
-if not bad_files:
-    print("No bad files found")
-else:
-    print(f"\nBad files found:")
+had_errors = bad_files or too_long_filenames
+if had_errors:
+    print("Errors:")
+
+if bad_files:
+    print(f"\nBad attachment files found:")
     for filename in bad_files:
         print(filename)
+
+if too_long_filenames:
+    print("WARNING: Some generated filenames are too long. Please rename them in Notion.")
+    print("Too long filenames:")
+    for filename in too_long_filenames:
+        print(filename)
+
 
 # Save temporary file collection to new zip
 make_archive( NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
 
-
+if bad_files or too_long_filenames:
+    sys.exit(1)
 
 
 # Close out!
 notionsData.close()
+
+if had_errors:
+    sys.exit(1)
