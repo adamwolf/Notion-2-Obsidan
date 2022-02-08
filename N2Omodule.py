@@ -301,19 +301,14 @@ def feature_tags_convert(line):
     # Convert tags after lines starting with "Tags:"
     regexTags = "^Tags:\s(.+)"
     
-        # Search for Internal Links. Will give match.group(1) & match.group(2)
+    # Search for Internal Links. Will give match.group(1) & match.group(2)
     tagMatch = search(regexTags,line)
-    
-    Otags = []
-    num_tag = 0
+    obsidian_tags = []
     if tagMatch:
-        Ntags = tagMatch.group(1).split(",")
-        for t in enumerate(Ntags):
-            Otags.append("#"+t[1].strip())
-            num_tag += 1
-        line = "Tags: "+", ".join(Otags)
-    
-    return line, num_tag
+        notion_tags = tagMatch.group(1).split(',')
+        obsidian_tags = [f"#{tag}" for tag in notion_tags]
+
+    return obsidian_tags
 
 
 def N2Omd(mdFile):
@@ -323,6 +318,7 @@ def N2Omd(mdFile):
     in_link_cnt = 0
     bl_link_cnt = 0
     tags_cnt = 0
+    tags = []
 
     for line in mdFile:
 
@@ -337,14 +333,15 @@ def N2Omd(mdFile):
         line, cnt = convertBlankLink(line)
         bl_link_cnt += cnt
 
-        line, cnt = feature_tags_convert(line)
-        tags_cnt += cnt
+        tags = feature_tags_convert(line)
+        tags_cnt += len(tags)
 
-        newLines.append(line)
-    
+        if not tags:
+            newLines.append(line)
+    if tags:
+        frontmatter = ["---", "tags: [" + ", ".join(tags) + "]","---", ""]
+        newLines = frontmatter + newLines
 
+    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt, tags_cnt]
 
-    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt,tags_cnt]
-
-    
     
