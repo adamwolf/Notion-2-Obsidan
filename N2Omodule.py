@@ -262,6 +262,8 @@ def internal_link_convert(line):
     regexRelativePathImage  =   compile("(?:\.png|\.jpg|\.gif|\.bmp|\.jpeg|\.svg)")
     regexSlash =    compile("\/")
 
+    substitution = None
+
     num_matchs = 0
     # Identify and group relative paths
     # While for incase multiple match on single line
@@ -289,11 +291,11 @@ def internal_link_convert(line):
                 title = str_slash_char_remove(title)
 
                 if title != markdownLinkMatch.group(1):
-                    print(line)
+                    substitution = [line]
                     line = regexMarkdownLink.sub("[["+title+"]]", line)
-                    print(f" remove forbid {line}\n")
+                    substitution.append(line)
 
-    return line, num_matchs
+    return line, num_matchs, substitution
 
 
 def feature_tags_convert(line):
@@ -301,19 +303,14 @@ def feature_tags_convert(line):
     # Convert tags after lines starting with "Tags:"
     regexTags = "^Tags:\s(.+)"
     
-        # Search for Internal Links. Will give match.group(1) & match.group(2)
+    # Search for Internal Links. Will give match.group(1) & match.group(2)
     tagMatch = search(regexTags,line)
-    
-    Otags = []
-    num_tag = 0
+    obsidian_tags = []
     if tagMatch:
-        Ntags = tagMatch.group(1).split(",")
-        for t in enumerate(Ntags):
-            Otags.append("#"+t[1].strip())
-            num_tag += 1
-        line = "Tags: "+", ".join(Otags)
-    
-    return line, num_tag
+        notion_tags = tagMatch.group(1).split(',')
+        obsidian_tags = [f"#{tag}" for tag in notion_tags]
+
+    return obsidian_tags
 
 
 def N2Omd(mdFile):
@@ -323,6 +320,7 @@ def N2Omd(mdFile):
     in_link_cnt = 0
     bl_link_cnt = 0
     tags_cnt = 0
+    tags = []
 
     for line in mdFile:
 
@@ -331,20 +329,21 @@ def N2Omd(mdFile):
         line, cnt = embedded_link_convert(line)
         em_link_cnt += cnt
 
-        line, cnt = internal_link_convert(line)
+        line, cnt, substitution = internal_link_convert(line)
         in_link_cnt += cnt
 
         line, cnt = convertBlankLink(line)
         bl_link_cnt += cnt
 
-        line, cnt = feature_tags_convert(line)
-        tags_cnt += cnt
+        tags = feature_tags_convert(line)
+        tags_cnt += len(tags)
 
-        newLines.append(line)
-    
+        if not tags:
+            newLines.append(line)
+    if tags:
+        frontmatter = ["---", "tags: [" + ", ".join(tags) + "]","---", ""]
+        newLines = frontmatter + newLines
 
+    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt, tags_cnt], substitution
 
-    return newLines, [in_link_cnt, em_link_cnt, bl_link_cnt,tags_cnt]
-
-    
     

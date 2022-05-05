@@ -4,7 +4,7 @@ Created on Thu Jun 18 13:34:37 2020
 
 @author: books
 """
-
+import sys
 from os import makedirs, path
 from re import compile
 from shutil import copyfileobj, make_archive
@@ -12,10 +12,20 @@ from zipfile import ZipFile
 from pathlib import Path
 import N2Omodule
 from tempfile import TemporaryDirectory
-from easygui import fileopenbox
+import argparse
+import errno
 
 
-NotionZip = Path(fileopenbox(filetypes = ['*.zip']))
+parser = argparse.ArgumentParser(
+    usage="%(prog)s FILE",
+    description="Convert Notion export zip to Markdown for Obsidian"
+)
+
+parser.add_argument('file', help='path to notion export zip file')
+
+args = parser.parse_args()
+
+NotionZip = Path(args.file)
 
 
 # Load zip file
@@ -102,6 +112,8 @@ for n in csvIndex:
         with open(newfilepath, append_write, encoding='utf-8') as tempFile:
             [print(line.rstrip(), file=tempFile) for line in mdTitle]
 
+too_long_filenames = []
+substitutions = {}
 
 num_link = [0, 0, 0, 0]
 # Process all MD files
@@ -111,7 +123,9 @@ for n in mdIndex:
     with notionsData.open(NotionPathRaw[n], "r") as mdFile:
         
         # Find and convert Internal Links to Obsidian style
-        mdContent, cnt = N2Omodule.N2Omd(mdFile)
+        mdContent, cnt, substitution = N2Omodule.N2Omd(mdFile)
+        if substitution:
+            substitutions[NotionPathRaw[n]] = substitution
         num_link = [cnt[i]+num_link[i] for i in range(len(num_link))]
         
         # Exported md file include header in first line
@@ -121,20 +135,24 @@ for n in mdIndex:
         new_file_name = mdContent[0].replace('# ', '') + '.md'
         new_file_name = regexForbitCharacter.sub("", new_file_name)
         newfilepath = tempPath / path.dirname(ObsidianPaths[n]) / new_file_name
-        
+
         # Check if file exists, append if true
         if path.exists(newfilepath):
             append_write = 'a' # append if already exists
         else:
             append_write = 'w' # make a new file if not
-        
-        # Save modified content as new .md file
-        with open(newfilepath, append_write, encoding='utf-8') as tempFile:
-            [print(line.rstrip(), file=tempFile) for line in mdContent]
 
+        try:
+            # Save modified content as new .md file
+            with open(newfilepath, append_write, encoding='utf-8') as tempFile:
+                [print(line.rstrip(), file=tempFile) for line in mdContent]
+        except OSError as exc:
+            if exc.errno == errno.ENAMETOOLONG:
+                too_long_filenames.append(new_file_name)
+            else:
+                raise
 
-
-
+bad_files = []
 #### Process all attachment files using othersIndex ####
 for n in othersIndex:
     
@@ -149,13 +167,7 @@ for n in othersIndex:
                 copyfileobj(zf, f)
     except:
         ## If there's issue, List bad files in a log file
-        with open(tempPath / 'ProblemFiles.md', 'a+', encoding='utf-8') as e:
-            if path.getsize(tempPath / 'ProblemFiles.md') == 0:
-                print('# List of corrupt files from', NotionZip, file=e)
-                print('', file=e)
-            print('  !!File Exception!!',ObsidianPaths[n])
-            print(NotionPathRaw[n], file=e)
-            print('', file=e)
+        bad_files.append(ObsidianPaths[n])
 
     
 print(f"\nTotal converted links:")
@@ -164,12 +176,35 @@ print(f"    - Embedded links: {num_link[1]}")
 print(f"    - Blank links   : {num_link[2]}")
 print(f"    - Number tags   : {num_link[3]}")
 
+if substitutions:
+    print(f"\nLink substitutions:")
+    for key, (original, replacement) in substitutions.items():
+        print(f"    - {key}: {original} -> {replacement}")
+
+had_errors = bad_files or too_long_filenames
+if had_errors:
+    print("Errors:")
+
+if bad_files:
+    print(f"\nBad attachment files found:")
+    for filename in bad_files:
+        print(f"    - {filename}")
+
+if too_long_filenames:
+    print("WARNING: Some generated filenames are too long. Please rename them in Notion.")
+    print("Too long filenames:")
+    for filename in too_long_filenames:
+        print(f"    - {filename}")
+
 
 # Save temporary file collection to new zip
-make_archive( NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
+output_filepath = make_archive(NotionZip.parent / (NotionZip.name[:-4]+'-ObsidianReady'), 'zip', tempPath)
 
-
+print(f"Created output zip at {output_filepath}")
 
 
 # Close out!
 notionsData.close()
+
+if had_errors:
+    sys.exit(1)
